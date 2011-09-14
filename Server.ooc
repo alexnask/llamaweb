@@ -5,12 +5,23 @@ import net/[ServerSocket,TCPSocket]
 import threading/Thread
 
 extend TCPSocketReader {
-    readAll: func -> String {
+    readUntil: func(s: String) -> String {
         data := ""
-        while(!data endsWith?("\r\n\r\n")) {
+        while(!data endsWith?(s) && hasNext?()) {
             data += read()
         }
         data
+    }
+}
+
+extend String {
+    parseQuery: func -> HashMap<String,String> {
+        ret := HashMap<String,String> new()
+        split("&",true) each(|param|
+            pos := param find("=",0)
+            ret add(param substring(0,pos),param substring(pos+1))
+        )
+        ret
     }
 }
 
@@ -25,6 +36,7 @@ HttpContext: class {
     host: String
     headers := HashMap<String,String> new()
     get := HashMap<String,String> new()
+    post := HashMap<String,String> new()
     method: Method
     init: func(data: String) {
         if(data startsWith?("GET")) {
@@ -35,18 +47,14 @@ HttpContext: class {
 
         path = data split(' ',true) get(1)
         if((pos := path find("?",0)) != -1) {
-            querystring := path substring(pos+1)
+            get = path substring(pos+1) parseQuery()
             path = path substring(0,pos)
-            querystring split("&",true) each(|param|
-                ndex := param find("=",0)
-                get add(param substring(0,ndex), param substring(ndex+1))
-            )
         }
 
         lines := data split("\r\n",true) slice(1,-1)
         lines each(|line|
             if((pos := line find(":",0)) != -1) {
-                headers add(line substring(0,pos), line substring(pos+1))
+                headers add(line substring(0,pos), line substring(pos+1) trimLeft())
             }
         )
     }
@@ -58,11 +66,11 @@ LlamaServer: class {
 
     init: func
     get: func(route: String, f: Func(HttpContext)->String) {
-        getM add(route,f)
+        getM add("^" + route + "$",f)
     }
 
     post: func(route: String, f: Func(HttpContext)->String) {
-        postM add(route,f)
+        postM add("^" + route + "$",f)
     }
 
     launch: func(s: String) {
@@ -78,14 +86,20 @@ LlamaServer: class {
         while(true) {
             client := sock accept()
             thread := Thread new(||
-                data := client in readAll()
+                data := client in readUntil("\r\n\r\n")
                 ctx := HttpContext new(data)
+                if(ctx method == Method POST && ctx headers["Content-Length"]) {
+                    size := ctx headers["Content-Length"] toInt()
+                    cdata := CString new(size)
+                    client in read(cdata,0,size)
+                    if(cdata) ctx post = cdata toString() parseQuery()
+                }
                 html := ""
                 matched? := false
 
                 if(ctx method == Method GET) {
                     for(key in getM getKeys()) {
-                        reg := Regexp compile(key)
+                        reg := Regexp compile(key,RegexpOption ANCHORED)
                         if(ctx matches = reg matches(ctx path)) {
                             html = getM[key](ctx)
                             matched? = true
@@ -93,7 +107,7 @@ LlamaServer: class {
                     }
                 } else if(ctx method == Method POST) {
                     for(key in postM getKeys()) {
-                        reg := Regexp compile(key)
+                        reg := Regexp compile(key,RegexpOption ANCHORED)
                         if(ctx matches = reg matches(ctx path)) {
                             html = postM[key](ctx)
                             matched? = true
