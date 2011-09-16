@@ -4,6 +4,8 @@ import text/[Regexp,StringTokenizer]
 import net/[ServerSocket,TCPSocket]
 import threading/Thread
 
+// TODO: urldecode post data :O
+
 extend TCPSocketReader {
     readUntil: func(s: String) -> String {
         data := ""
@@ -31,6 +33,7 @@ Method: enum {
 }
 
 HttpContext: class {
+    server: LlamaServer
     matches: Match
     path: String
     host: String
@@ -88,6 +91,7 @@ LlamaServer: class {
             thread := Thread new(||
                 data := client in readUntil("\r\n\r\n")
                 ctx := HttpContext new(data)
+                ctx server = this
                 if(ctx method == Method POST && ctx headers["Content-Length"]) {
                     size := ctx headers["Content-Length"] toInt()
                     cdata := CString new(size)
