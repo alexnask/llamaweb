@@ -64,6 +64,7 @@ HttpContext: class {
 }
 
 LlamaServer: class {
+    contentType := "text/html; charset=utf-8"
     getM := HashMap<String,Func(HttpContext)->String> new()
     postM := HashMap<String,Func(HttpContext)->String> new()
 
@@ -119,7 +120,7 @@ LlamaServer: class {
                     }
                 }
 
-                head := "HTTP/1.1 " + ((matched?) ? "200 OK" : "404 NOT FOUND") + "\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n\r\n"
+                head := "HTTP/1.1 " + ((matched?) ? "200 OK" : "404 NOT FOUND") + "\r\nContent-Type: " + contentType + "\r\nConnection: close\r\n\r\n"
                 resp := head + html + "\r\n\r\n"
                 client out write(resp _buffer data, resp length())
                 client out close()
