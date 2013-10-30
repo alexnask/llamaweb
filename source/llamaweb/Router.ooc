@@ -89,12 +89,14 @@ Router: class {
         }
 
         for(route in routes) {
-            matches := route pattern matches(ctx request path)
-            if(matches) {
-                hashBag := HashBag new()
-                // Fill the hashBag from the matches
-                route action(ctx, hashBag)
-                return true
+            if((route method && ctx request method == route method) || !route method) {
+                matches := route pattern matches(ctx request path)
+                if(matches) {
+                    hashBag := HashBag new()
+                    // Fill the hashBag from the matches
+                    route action(ctx, hashBag)
+                    return true
+                }
             }
         }
 

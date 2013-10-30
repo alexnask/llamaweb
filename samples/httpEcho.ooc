@@ -1,7 +1,7 @@
 import llamaweb/[Router, Server]
 
 // TODO: Implement FastCGI or SCGI or something like that :P
-llama := Server new(80)
+llama := Server new(9999)
 
 // Get a router to all hosts
 r := llama router("*")
